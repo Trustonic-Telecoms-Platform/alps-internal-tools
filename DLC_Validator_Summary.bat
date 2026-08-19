@@ -17,7 +17,12 @@ REM ============================================================
 REM RUTAS DE EJECUCION
 REM ============================================================
 
-set "SCRIPT_DIR=%~dp0"
+if defined DLC_HOME (
+    set "SCRIPT_DIR=%DLC_HOME%"
+) else (
+    set "SCRIPT_DIR=%~dp0"
+)
+
 set "ADB=%SCRIPT_DIR%adb.exe"
 set "PATH=%SCRIPT_DIR%;%PATH%"
 set "SUMMARY=%SCRIPT_DIR%DLC_Validator_Report.txt"
