@@ -4,8 +4,8 @@ REM DLC_Validator Summary
 REM InternalName: DLC_Validator_Summary
 REM Author: Mauricio Gutierrez
 REM Department: Security / QA / DeviceLock Integration
-REM ProductVersion: 3.0
-REM FileVersion: 3.0.0
+REM ProductVersion: 4.0
+REM FileVersion: 4.0.0
 REM Output: DLC_Validator_Report.txt
 REM ============================================================
 
@@ -13,20 +13,35 @@ chcp 65001 >nul
 color 0B
 setlocal EnableDelayedExpansion
 
-set "SUMMARY=DLC_Validator_Report.txt"
-set "TMP=%TEMP%\dlc_validator_summary_tmp.txt"
+REM ============================================================
+REM RUTAS DE EJECUCION
+REM ============================================================
+
+set "SCRIPT_DIR=%~dp0"
+set "ADB=%SCRIPT_DIR%adb.exe"
+set "PATH=%SCRIPT_DIR%;%PATH%"
+set "SUMMARY=%SCRIPT_DIR%DLC_Validator_Report.txt"
+set "TEMP_FILE=%TEMP%\dlc_validator_summary_tmp.txt"
+
+if not exist "%ADB%" (
+    echo ERROR: No se encontro adb.exe en la carpeta de DLC Validator.
+    echo Mantenga adb.exe junto al archivo BAT.
+    echo.
+    pause
+    exit /b 2
+)
 
 set /a OK_COUNT=0
 set /a INFO_COUNT=0
 set /a REVIEW_COUNT=0
 
 if exist "%SUMMARY%" del "%SUMMARY%" >nul 2>&1
-if exist "%TMP%" del "%TMP%" >nul 2>&1
+if exist "%TEMP_FILE%" del "%TEMP_FILE%" >nul 2>&1
 
 echo ============================================================ >> "%SUMMARY%"
 echo DLC VALIDATION REPORT >> "%SUMMARY%"
-echo Version de herramienta: 3.0 >> "%SUMMARY%"
-echo Formato de reporte: Summary v3.0 >> "%SUMMARY%"
+echo Version de herramienta: 4.0 >> "%SUMMARY%"
+echo Formato de reporte: Summary v4.0 >> "%SUMMARY%"
 echo Fecha de ejecucion: %DATE% >> "%SUMMARY%"
 echo ============================================================ >> "%SUMMARY%"
 echo. >> "%SUMMARY%"
@@ -38,9 +53,9 @@ echo [0] DISPOSITIVO CONECTADO >> "%SUMMARY%"
 echo. >> "%SUMMARY%"
 
 adb start-server >nul 2>&1
-adb devices > "%TMP%" 2>&1
+adb devices > "%TEMP_FILE%" 2>&1
 
-findstr /I "unauthorized" "%TMP%" >nul
+findstr /I "unauthorized" "%TEMP_FILE%" >nul
 if not errorlevel 1 (
     echo [REVIEW] Dispositivo conectado pero no autorizado para ADB. >> "%SUMMARY%"
     echo Accion: Acepte la clave RSA en el telefono y vuelva a ejecutar DLC Validator Summary. >> "%SUMMARY%"
@@ -55,7 +70,7 @@ if not errorlevel 1 (
     exit /b 10
 )
 
-findstr /I "offline" "%TMP%" >nul
+findstr /I "offline" "%TEMP_FILE%" >nul
 if not errorlevel 1 (
     echo [REVIEW] Dispositivo detectado en estado OFFLINE mediante ADB. >> "%SUMMARY%"
     set /a REVIEW_COUNT+=1
@@ -64,7 +79,7 @@ if not errorlevel 1 (
     goto FINAL_REPORT
 )
 
-findstr /R /C:"device$" "%TMP%" >nul
+findstr /R /C:"device$" "%TEMP_FILE%" >nul
 if errorlevel 1 (
     echo [REVIEW] No se detecto ningun dispositivo autorizado por ADB. >> "%SUMMARY%"
     set /a REVIEW_COUNT+=1
@@ -179,7 +194,7 @@ echo [3] INTEGRACION DLC - PAQUETES DEL SISTEMA >> "%SUMMARY%"
 echo ============================================================ >> "%SUMMARY%"
 echo. >> "%SUMMARY%"
 
-adb shell pm list packages 2>nul | findstr /I "com.google.android.devicelockcontroller" > "%TMP%"
+adb shell pm list packages 2>nul | findstr /I "com.google.android.devicelockcontroller" > "%TEMP_FILE%"
 
 if errorlevel 1 (
     echo [REVIEW] Google Device Lock Controller no detectado. >> "%SUMMARY%"
@@ -190,7 +205,7 @@ if errorlevel 1 (
     set /a OK_COUNT+=1
 )
 
-adb shell pm list packages -f 2>nul | findstr /I "devicelock.apex com.android.devicelock" > "%TMP%"
+adb shell pm list packages -f 2>nul | findstr /I "devicelock.apex com.android.devicelock" > "%TEMP_FILE%"
 
 if errorlevel 1 (
     echo [INFO] No se detecto modulo DeviceLock APEX. >> "%SUMMARY%"
@@ -201,7 +216,7 @@ if errorlevel 1 (
     set /a OK_COUNT+=1
 )
 
-adb shell pm list packages -d 2>nul | findstr /I "com.google.android.devicelockcontroller com.trustonic.telecoms.standard.dlc com.trustonic.telecoms.standard.dpc" > "%TMP%"
+adb shell pm list packages -d 2>nul | findstr /I "com.google.android.devicelockcontroller com.trustonic.telecoms.standard.dlc com.trustonic.telecoms.standard.dpc" > "%TEMP_FILE%"
 
 if errorlevel 1 (
     echo [OK] Paquetes DLC relacionados habilitados. >> "%SUMMARY%"
@@ -210,7 +225,7 @@ if errorlevel 1 (
     echo [REVIEW] Se detectaron paquetes DLC relacionados deshabilitados. >> "%SUMMARY%"
     set /a REVIEW_COUNT+=1
     echo Paquetes deshabilitados detectados: >> "%SUMMARY%"
-    type "%TMP%" >> "%SUMMARY%"
+    type "%TEMP_FILE%" >> "%SUMMARY%"
     echo Accion: Inserte una SIM activa, reinicie el dispositivo y repita la prueba. Algunas configuraciones pueden habilitarse despues de cargar el perfil del operador. >> "%SUMMARY%"
 )
 
@@ -224,7 +239,7 @@ echo [4] SERVICIOS DLC - ACTIVITY MANAGER - SYSTEM SERVER >> "%SUMMARY%"
 echo ============================================================ >> "%SUMMARY%"
 echo. >> "%SUMMARY%"
 
-adb shell dumpsys activity services 2>nul | findstr /I "dlc devicelock DeviceLockService DeviceLockController" > "%TMP%"
+adb shell dumpsys activity services 2>nul | findstr /I "dlc devicelock DeviceLockService DeviceLockController" > "%TEMP_FILE%"
 
 if errorlevel 1 (
     echo [INFO] No se detectaron servicios DLC visibles mediante diagnostico Android. >> "%SUMMARY%"
@@ -277,9 +292,9 @@ if "%SIM_AVAILABLE%"=="1" (
     set "SHOW_CARRIER_NOTE=1"
 )
 
-adb shell dumpsys carrier_config 2>nul > "%TMP%"
+adb shell dumpsys carrier_config 2>nul > "%TEMP_FILE%"
 
-findstr /I "call_screening_app" "%TMP%" | findstr /I "com.trustonic.telecoms.standard.dlc" >nul
+findstr /I "call_screening_app" "%TEMP_FILE%" | findstr /I "com.trustonic.telecoms.standard.dlc" >nul
 if errorlevel 1 (
     if "%SIM_AVAILABLE%"=="1" (
         echo [REVIEW] CALL SCREENING no detectado o no asociado a DLC. >> "%SUMMARY%"
@@ -295,7 +310,7 @@ if errorlevel 1 (
     set /a OK_COUNT+=1
 )
 
-findstr /I "call_redirection_service_component_name_string" "%TMP%" | findstr /I "com.trustonic.telecoms.standard.dlc" >nul
+findstr /I "call_redirection_service_component_name_string" "%TEMP_FILE%" | findstr /I "com.trustonic.telecoms.standard.dlc" >nul
 if errorlevel 1 (
     if "%SIM_AVAILABLE%"=="1" (
         echo [REVIEW] CALL REDIRECTION no detectado o no asociado a DLC. >> "%SUMMARY%"
@@ -311,7 +326,7 @@ if errorlevel 1 (
     set /a OK_COUNT+=1
 )
 
-findstr /I "carrier_config call_screening_app call_redirection_service_component_name_string" "%TMP%" >nul
+findstr /I "carrier_config call_screening_app call_redirection_service_component_name_string" "%TEMP_FILE%" >nul
 if errorlevel 1 (
     echo [INFO] CarrierConfig no expuso informacion suficiente mediante diagnostico Android. >> "%SUMMARY%"
     set /a INFO_COUNT+=1
@@ -412,7 +427,7 @@ echo. >> "%SUMMARY%"
 echo Archivo generado: %SUMMARY% >> "%SUMMARY%"
 echo ============================================================ >> "%SUMMARY%"
 
-if exist "%TMP%" del "%TMP%" >nul 2>&1
+if exist "%TEMP_FILE%" del "%TEMP_FILE%" >nul 2>&1
 
 echo.
 echo Proceso completado.
